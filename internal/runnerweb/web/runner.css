@@ -1,0 +1,165 @@
+:root {
+  color-scheme: dark;
+  --background: #121519;
+  --surface: #1a1e24;
+  --control: #15191e;
+  --border: #333b46;
+  --text: #edf0f4;
+  --muted: #a8b3bf;
+  --accent: #ffd477;
+  --dark: #211a0d;
+  --success: #9de2b6;
+  --error: #ffb2ad;
+  font: 15px/1.5 system-ui, sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--background); color: var(--text); }
+a { color: inherit; text-decoration: none; }
+p, h1, h2 { margin: 0; }
+h1 { font-size: 1.85rem; line-height: 1.2; letter-spacing: -.025em; }
+h2 { font-size: 1.05rem; overflow-wrap: anywhere; }
+button, input, select { font: inherit; }
+
+.shell { max-width: 1200px; margin-inline: auto; padding-inline: clamp(16px, 4vw, 48px); }
+.masthead { background: var(--surface); border-bottom: 1px solid var(--border); }
+.header-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 64px; }
+.header-brand { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; min-width: 0; padding-block: 8px; }
+.header-row #logout { flex-shrink: 0; }
+.brand { display: inline-flex; align-items: center; gap: 9px; font-weight: 750; }
+.brand-icon {
+  display: grid;
+  place-items: center;
+  width: 27px;
+  height: 27px;
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--dark);
+  font: 800 1rem/1 ui-monospace, monospace;
+}
+
+main { padding-block: 30px 48px; }
+#dashboard { display: grid; gap: 14px; }
+#runner-navigation { display: flex; gap: 4px; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+#runner-navigation a { padding: 6px 10px; border-radius: 6px; color: var(--muted); }
+#runner-navigation a:hover { background: var(--surface); color: var(--text); }
+#runner-navigation a[aria-current] { background: var(--surface); color: var(--accent); }
+.page-heading, .section-heading, .actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.page-heading, .section-heading { justify-content: space-between; }
+.section-heading { padding: 14px 18px; }
+.section-heading p { font-size: .87rem; }
+.surface { min-width: 0; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+.schedule { padding: 16px 18px; }
+.login { max-width: 410px; margin: min(9vh, 72px) auto; padding: 24px; }
+.login form { display: grid; gap: 14px; margin-top: 18px; }
+.login button { justify-self: start; }
+.login h1 { margin-bottom: 6px; }
+#job-fields { min-width: 0; border: 0; padding: 0; margin: 12px 0 0; }
+#connection-view { max-width: 760px; }
+.connection-details { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 14px; margin: 12px 0; }
+.connection-details dt { color: var(--muted); font-size: .85rem; }
+.connection-details dd { margin: 0; overflow-wrap: anywhere; }
+#connection-fields { display: grid; justify-items: start; gap: 10px; min-width: 0; border: 0; padding: 0; margin: 16px 0 0; }
+#connection-fields label { width: 100%; }
+.fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 12px; margin-bottom: 14px; }
+.wide { grid-column: 1 / -1; }
+.dockerfile-field button { margin-top: 6px; }
+
+label { display: grid; align-content: start; gap: 4px; color: var(--muted); font-size: .86rem; min-width: 0; }
+input, select {
+  min-width: 0;
+  width: 100%;
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--control);
+  color: var(--text);
+}
+input::file-selector-button {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 7px;
+  margin-right: 8px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+button {
+  padding: 7px 11px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--dark);
+  font-size: .87rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+button:hover { filter: brightness(1.08); }
+button.secondary { border-color: var(--border); background: var(--control); color: var(--text); }
+button:disabled { opacity: .45; cursor: default; }
+button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible, [tabindex]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.muted, .hint { color: var(--muted); }
+.hint, .meta { font-size: .8rem; }
+.notice {
+  margin-top: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.notice.inset { margin: 0 18px 12px; }
+.notice.error { color: var(--error); }
+.notice.success { color: var(--success); }
+
+.table-scroll { overflow: auto; }
+table { border-collapse: collapse; width: 100%; min-width: 620px; text-align: left; font-size: .9rem; }
+th, td { border-top: 1px solid var(--border); padding: 8px 12px; vertical-align: top; }
+th:first-child, td:first-child { padding-left: 18px; }
+th { background: var(--control); color: var(--muted); font-weight: 650; }
+tbody tr:nth-child(even) { background: #171b20; }
+td { overflow-wrap: anywhere; }
+.actions { gap: 6px; }
+.actions button { padding: 4px 8px; }
+.job-name { font-weight: 650; }
+.status { font-weight: 650; text-transform: capitalize; }
+.status.active { color: var(--accent); }
+.status.success { color: var(--success); }
+.job-error, .status.error { color: var(--error); }
+.connection-indicator { padding: 3px 9px; border: 1px solid var(--border); border-radius: 999px; background: var(--control); color: var(--muted); font-size: .8rem; }
+.connection-indicator:hover { border-color: var(--muted); }
+.connection-indicator .status { display: inline-flex; align-items: center; gap: 6px; }
+.connection-indicator .status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.job-error { max-width: 32ch; white-space: pre-wrap; }
+.empty { padding-block: 18px; color: var(--muted); }
+
+#log-output {
+  max-height: 340px;
+  min-height: 72px;
+  margin: 0;
+  padding: 12px 18px;
+  border-top: 1px solid var(--border);
+  border-radius: 0 0 10px 10px;
+  overflow: auto;
+  background: var(--control);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: .85rem/1.6 ui-monospace, monospace;
+}
+
+@media (max-width: 720px) {
+  .fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 420px) {
+  .fields, .connection-details { grid-template-columns: 1fr; }
+}

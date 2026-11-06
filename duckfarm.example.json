@@ -1,0 +1,17 @@
+{
+  "listen": "127.0.0.1:5137",
+  "database": "duckfarm.sqlite",
+  "teams": {
+    "Team 1": "10.60.1.3",
+    "Team 2": "10.60.2.3"
+  },
+  "flag_format": "[A-Z0-9]{31}=",
+  "timezone": "UTC",
+  "flag_lifetime_seconds": 300,
+  "submit_period_seconds": 2,
+  "submit_flag_limit": 100,
+  "submit_timeout_seconds": 30,
+  "retry_delay_seconds": 2,
+  "history_retention_hours": 24,
+  "checker": {}
+}

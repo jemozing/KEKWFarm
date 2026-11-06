@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>KEKWFarm Runner</title>
+  <link rel="stylesheet" href="/runner.css">
+  <script src="/runner.js" defer></script>
+</head>
+<body>
+  <header class="masthead">
+    <div class="shell header-row">
+      <div class="header-brand">
+        <a class="brand" href="/">
+          <span class="brand-icon" aria-hidden="true">K</span>
+          <span>KEKWFarm Runner</span>
+        </a>
+        <a id="header-connection" class="connection-indicator" href="#connection" aria-label="Farm connection: Connecting" hidden>
+          <span id="header-connection-status" class="status active" role="status">Connecting</span>
+        </a>
+      </div>
+      <button type="button" class="secondary" id="logout" hidden>Sign out</button>
+    </div>
+  </header>
+  <main class="shell">
+    <section id="login" class="surface login" aria-labelledby="login-title">
+      <h1 id="login-title">Sign in</h1>
+      <p class="muted">Enter the runner's web password.</p>
+      <form id="login-form" method="post">
+        <label>Password
+          <input id="password" name="password" type="password" autocomplete="current-password" required>
+        </label>
+        <button type="submit">Sign in</button>
+      </form>
+      <p class="notice" id="login-message" role="status" hidden></p>
+    </section>
+
+    <div id="dashboard" hidden>
+      <nav id="runner-navigation" aria-label="Runner views">
+        <a href="#jobs" aria-current="page">Jobs</a>
+        <a href="#connection">Connection</a>
+      </nav>
+      <div class="page-heading">
+        <h1 id="page-title">Runner jobs</h1>
+        <button type="button" class="secondary" id="refresh">Refresh</button>
+      </div>
+
+      <section class="surface schedule" id="schedule" aria-labelledby="schedule-title">
+        <h2 id="schedule-title">Schedule an exploit</h2>
+        <form id="job-form" method="post" enctype="multipart/form-data">
+          <fieldset id="job-fields">
+            <div class="fields">
+              <label class="wide">Exploit file
+                <input name="file" type="file" required aria-describedby="file-hint">
+                <span id="file-hint" class="hint">Upload one standalone file up to 10 MiB. Executables must be compatible with the container's Linux architecture.</span>
+              </label>
+              <div class="wide dockerfile-field">
+                <label>Dockerfile (optional)
+                  <input id="dockerfile" name="dockerfile" type="file" aria-describedby="dockerfile-hint">
+                  <span id="dockerfile-hint" class="hint">Up to 256 KiB. The build context contains only the Dockerfile and the uploaded program under its original filename. The first run builds the image. Later runs reuse it. Each target runs in a separate container.</span>
+                </label>
+                <button id="remove-dockerfile" type="button" class="secondary" hidden>Remove Dockerfile</button>
+              </div>
+              <label class="wide" id="prebuilt-image">Docker image
+                <input id="image" name="image" placeholder="python:3.14-slim-trixie" autocomplete="off" autocapitalize="off" spellcheck="false" aria-describedby="image-hint">
+                <span id="image-hint" class="hint">Leave empty to use the runner default. Prefer a prebuilt image available on the runner's Docker host, with the selected interpreter or the libraries your Linux executable needs. Each target run starts a separate container.</span>
+              </label>
+              <label>Job name
+                <input name="name" placeholder="Defaults to filename" maxlength="160" autocomplete="off">
+              </label>
+              <label>Interpreter
+                <select name="interpreter">
+                  <option value="python3">Python 3</option>
+                  <option value="sh">Shell (sh)</option>
+                  <option value="binary">Executable</option>
+                </select>
+              </label>
+              <label>Start time
+                <input name="start_at" type="datetime-local" step="1" aria-describedby="start-hint">
+                <span id="start-hint" class="hint">Uses your browser's local time. Leave empty to start now.</span>
+              </label>
+              <label>Interval (seconds)
+                <input name="interval_seconds" type="number" min="0" max="86400" step="1" value="0" required aria-describedby="interval-hint">
+                <span id="interval-hint" class="hint">Use 0 for a single run. Use 60 to start a run once a minute.</span>
+              </label>
+              <label>Timeout per target (seconds)
+                <input name="timeout_seconds" type="number" min="1" max="3600" step="1" value="10" required>
+              </label>
+              <label>Parallelism
+                <input name="parallelism" type="number" min="1" max="32" step="1" value="4" required aria-describedby="parallel-hint">
+                <span id="parallel-hint" class="hint">Maximum simultaneous targets.</span>
+              </label>
+            </div>
+            <button type="submit">Schedule job</button>
+          </fieldset>
+        </form>
+        <p class="notice" id="schedule-message" role="status" hidden></p>
+      </section>
+
+      <section class="surface" id="job-list" aria-labelledby="jobs-title">
+        <div class="section-heading">
+          <h2 id="jobs-title">Jobs</h2>
+          <p class="muted" id="jobs-count"></p>
+        </div>
+        <p class="notice inset" id="jobs-load-message" role="status" hidden></p>
+        <p class="notice inset" id="jobs-message" role="status" hidden></p>
+        <div class="table-scroll" tabindex="0" role="region" aria-label="Runner jobs">
+          <table>
+            <thead>
+              <tr><th scope="col">Job</th><th scope="col">Schedule</th><th scope="col">Limits</th><th scope="col">Status</th><th scope="col">Actions</th></tr>
+            </thead>
+            <tbody id="jobs-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="surface" id="logs" aria-labelledby="logs-title" hidden>
+        <div class="section-heading">
+          <h2 id="logs-title">Job output</h2>
+          <button type="button" class="secondary" id="close-logs">Close</button>
+        </div>
+        <p class="notice inset" id="logs-message" role="status" hidden></p>
+        <pre id="log-output" tabindex="0" role="region" aria-label="Job log"></pre>
+      </section>
+
+      <section class="surface schedule" id="connection-view" aria-labelledby="connection-title" hidden>
+        <h2 id="connection-title">Farm connection</h2>
+        <dl class="connection-details">
+          <div><dt>Status</dt><dd id="connection-status" class="status" role="status">—</dd></div>
+          <div><dt>Farm endpoint</dt><dd id="connection-endpoint">—</dd></div>
+          <div><dt>Last successful heartbeat (UTC)</dt><dd id="connection-last-seen">—</dd></div>
+          <div><dt>Runner token</dt><dd id="connection-token-state">—</dd></div>
+        </dl>
+        <p class="notice error" id="connection-error" role="status" hidden></p>
+        <p class="notice" id="connection-read-message" role="status" hidden></p>
+        <form id="connection-form" method="post" autocomplete="off">
+          <fieldset id="connection-fields" disabled>
+            <label>Farm URL
+              <input id="connection-url" name="url" inputmode="url" placeholder="https://farm.example" required autocapitalize="off" spellcheck="false">
+            </label>
+            <label>Replacement runner token
+              <input type="password" id="connection-token" name="token" autocomplete="new-password" aria-describedby="connection-token-hint">
+              <span id="connection-token-hint" class="hint">Leave empty to keep the current token. If none is configured, changing the URL requires a token from the farm's Runners tab.</span>
+            </label>
+            <button type="submit">Save connection</button>
+          </fieldset>
+        </form>
+        <p class="notice" id="connection-save-message" role="status" hidden></p>
+      </section>
+    </div>
+  </main>
+</body>
+</html>

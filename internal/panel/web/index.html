@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>KEKWFarm</title>
+  <link rel="stylesheet" href="/panel.css">
+  <script src="/panel.js" defer></script>
+</head>
+<body>
+  <header class="masthead">
+    <div class="shell header-row">
+      <a class="brand" href="#flags">
+        <span class="brand-icon" aria-hidden="true">K</span>
+        <span>KEKWFarm</span>
+      </a>
+      <nav id="navigation" aria-label="Farm views" hidden>
+        <a href="#flags">Flags</a>
+        <a href="#teams">Teams</a>
+        <a href="#summary">Summary</a>
+        <a href="#runners">Runners</a>
+        <a href="#checker">Checker</a>
+      </nav>
+      <button type="button" class="secondary" id="logout" hidden>Sign out</button>
+    </div>
+  </header>
+  <main class="shell">
+    <section id="login" class="surface login" aria-labelledby="login-title">
+      <h1 id="login-title">Sign in</h1>
+      <p class="muted">Enter the farm's server password.</p>
+      <form id="login-form" method="post">
+        <label>Password
+          <input id="password" name="password" type="password" autocomplete="current-password" required>
+        </label>
+        <button type="submit">Sign in</button>
+      </form>
+      <p class="notice" id="login-message" role="status" hidden></p>
+    </section>
+
+    <div id="dashboard" hidden>
+      <div class="page-heading">
+        <h1 id="page-title">Flags</h1>
+        <button type="button" class="secondary" id="refresh">Refresh</button>
+      </div>
+      <p id="page-message" class="notice" role="status" hidden></p>
+
+      <section id="flags-view" aria-label="Flags">
+        <div class="forms">
+          <section class="surface" aria-labelledby="filters-title">
+            <h2 id="filters-title">Filter flags</h2>
+            <form id="filters-form">
+              <div class="fields">
+                <label>Exploit
+                  <input name="sploit" list="exploit-options" autocomplete="off">
+                  <datalist id="exploit-options"></datalist>
+                </label>
+                <label>Team
+                  <input name="team" list="team-options" autocomplete="off">
+                  <datalist id="team-options"></datalist>
+                </label>
+                <label>Status
+                  <input name="status" list="status-options" autocomplete="off">
+                  <datalist id="status-options"></datalist>
+                </label>
+                <label>Flag contains
+                  <input name="flag" autocomplete="off">
+                </label>
+                <label>Since
+                  <input type="datetime-local" name="since" aria-describedby="server-timezone">
+                </label>
+                <label>Until
+                  <input type="datetime-local" name="until" aria-describedby="server-timezone">
+                </label>
+                <label class="wide">Checksystem response contains
+                  <input name="checksystem_response" autocomplete="off">
+                </label>
+              </div>
+              <p class="muted meta" id="server-timezone"></p>
+              <div class="actions">
+                <button type="submit">Apply filters</button>
+                <button class="secondary" type="reset">Clear</button>
+              </div>
+            </form>
+          </section>
+
+          <section class="surface" aria-labelledby="manual-title">
+            <h2 id="manual-title">Submit flags</h2>
+            <form id="manual-form" method="post">
+              <label>Text containing flags
+                <textarea id="manual-text" name="text" rows="6" spellcheck="false" required aria-describedby="flag-format"></textarea>
+              </label>
+              <p class="muted meta mono" id="flag-format"></p>
+              <button type="submit">Queue flags</button>
+            </form>
+            <p class="notice" id="manual-message" role="status" hidden></p>
+          </section>
+        </div>
+
+        <section class="surface results" aria-labelledby="results-title">
+          <div class="table-heading">
+            <h2 id="results-title">Flag history</h2>
+            <p class="muted" id="flag-count" aria-live="polite"></p>
+          </div>
+          <div class="table-scroll" tabindex="0" role="region" aria-label="Flag history">
+            <table>
+              <thead>
+                <tr><th scope="col">Exploit</th><th scope="col">Team</th><th scope="col">Flag</th><th scope="col">Received</th><th scope="col">Status</th><th scope="col">Checksystem response</th></tr>
+              </thead>
+              <tbody id="flags-body"></tbody>
+            </table>
+          </div>
+          <nav class="pagination" aria-label="Flag pages">
+            <button class="secondary" type="button" data-page="first">First</button>
+            <button class="secondary" type="button" data-page="previous">Previous</button>
+            <span id="page-number" class="muted"></span>
+            <button class="secondary" type="button" data-page="next">Next</button>
+            <button class="secondary" type="button" data-page="last">Last</button>
+          </nav>
+        </section>
+      </section>
+
+      <section class="surface results" id="teams-view" aria-label="Teams" hidden>
+        <div class="table-heading">
+          <h2>Targets</h2>
+          <p class="muted" id="team-count" aria-live="polite"></p>
+        </div>
+        <div class="table-scroll" tabindex="0" role="region" aria-label="Targets">
+          <table>
+            <thead><tr><th scope="col">Team</th><th scope="col">Address</th></tr></thead>
+            <tbody id="teams-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="surface results" id="summary-view" aria-label="Summary" hidden>
+        <div class="table-heading">
+          <h2>Flags by exploit and team</h2>
+          <label class="choice"><input type="checkbox" id="summary-response"> Group by checksystem response</label>
+        </div>
+        <div class="table-scroll" tabindex="0" role="region" aria-label="Flags by exploit and team">
+          <table>
+            <thead><tr><th scope="col">Exploit</th><th scope="col">Team</th><th scope="col">Counts</th></tr></thead>
+            <tbody id="summary-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="runners-view" aria-label="Runners" hidden>
+        <section class="surface runner-enrollment" aria-labelledby="runner-create-title">
+          <h2 id="runner-create-title">Register a runner</h2>
+          <form id="runner-form" class="actions" method="post" autocomplete="off">
+            <label>Runner name
+              <input name="name" required placeholder="Runner name">
+            </label>
+            <button id="runner-create" type="submit">Register</button>
+          </form>
+          <div id="runner-credential" class="runner-credential" hidden>
+            <label>New runner token
+              <input id="runner-token" class="mono" type="text" readonly autocomplete="off" spellcheck="false">
+            </label>
+            <p class="muted meta">Copy this token now. It is shown once.</p>
+            <div class="actions">
+              <button type="button" id="copy-runner-token">Copy token</button>
+              <button type="button" class="secondary" id="dismiss-runner-token">Dismiss</button>
+            </div>
+            <p id="runner-copy-message" class="notice" role="status" hidden></p>
+          </div>
+        </section>
+        <p id="runners-message" class="notice" role="status" hidden></p>
+        <section class="surface results" aria-labelledby="runner-list-title">
+          <div class="table-heading">
+            <h2 id="runner-list-title">Registered runners</h2>
+            <p id="runners-count" class="muted"></p>
+          </div>
+          <div class="table-scroll" tabindex="0" role="region" aria-label="Registered runners">
+            <table>
+              <thead>
+                <tr><th scope="col">Runner</th><th scope="col">Address</th><th scope="col">Connection</th><th scope="col">Last seen (UTC)</th><th scope="col">Jobs</th><th scope="col">Actions</th></tr>
+              </thead>
+              <tbody id="runners-body"></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
+      <section class="surface checker-settings" id="checker-view" aria-labelledby="checker-title" hidden>
+        <h2 id="checker-title">Flag submission</h2>
+        <p class="muted">Changes apply when you save. Enabling submission also sends eligible flags already in the queue.</p>
+        <p class="muted">The server connects to the checker. In Docker, use <code>host.docker.internal</code> to reach a checker on the host when that name is configured. <code>127.0.0.1</code> points to the container itself.</p>
+        <form id="checker-form" method="post" autocomplete="off">
+          <fieldset id="checker-controls" disabled>
+            <div id="checker-preset-fields">
+              <label>Protocol
+                <select name="protocol" id="checker-protocol" aria-describedby="checker-hint">
+                  <option value="">Disabled · collect flags only</option>
+                </select>
+              </label>
+              <p id="checker-hint" class="muted meta"></p>
+              <div class="fields">
+                <label class="wide" data-checker-field="url" hidden>Endpoint URL
+                  <input name="url" type="url" placeholder="https://checker.example/flags" spellcheck="false">
+                </label>
+                <label data-checker-field="host" hidden>Host
+                  <input name="host" placeholder="checker.example" spellcheck="false">
+                </label>
+                <label data-checker-field="port" hidden>Port
+                  <input name="port" type="number" min="1" max="65535" step="1" placeholder="31337">
+                </label>
+                <label data-checker-field="token" hidden>Team token
+                  <input name="token" type="password" autocomplete="off" spellcheck="false">
+                </label>
+                <label data-checker-field="team_id" hidden>Team ID
+                  <input name="team_id" spellcheck="false">
+                </label>
+              </div>
+            </div>
+            <div id="checker-json-fields" hidden>
+              <label>Checker configuration JSON
+                <textarea id="checker-json" rows="14" spellcheck="false" aria-describedby="checker-json-hint" disabled></textarea>
+              </label>
+              <p id="checker-json-hint" class="muted meta">JSON shows the team token. Use an existing protocol ID, a numeric port, and string values in <code>options</code>. VolgaCTF supports <code>info_limit</code> and <code>submit_limit</code>. CTF.Moscow supports <code>submit_limit</code>. For signed VolgaCTF flags, set <code>validator</code> to <code>volgactf</code> and <code>public_key</code> to the organizer’s PEM.</p>
+            </div>
+            <div class="actions">
+              <button type="submit">Save checker</button>
+              <button type="button" class="secondary" id="checker-mode">Edit JSON</button>
+            </div>
+          </fieldset>
+        </form>
+        <p id="checker-message" class="notice" role="status" hidden></p>
+      </section>
+    </div>
+  </main>
+</body>
+</html>

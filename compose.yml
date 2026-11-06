@@ -1,0 +1,93 @@
+name: kekwfarm
+
+x-runner: &runner-service
+  image: kekwfarm-runner:local
+  build:
+    context: .
+    target: runner
+  pull_policy: never
+  profiles: [runner]
+  user: "${KEKWFARM_USER:-65532:65532}"
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  restart: unless-stopped
+
+services:
+  farm:
+    image: kekwfarm:local
+    build: .
+    user: "${KEKWFARM_USER:-65532:65532}"
+    environment:
+      KEKWFARM_LISTEN: 0.0.0.0:5137
+      KEKWFARM_DATABASE: /data/duckfarm.sqlite
+      SERVER_PASSWORD: ${SERVER_PASSWORD:-}
+    ports:
+      - "127.0.0.1:5137:5137"
+    volumes:
+      - type: bind
+        source: ${KEKWFARM_CONFIG_FILE:-./duckfarm.json}
+        target: /config/duckfarm.json
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./vol/duckfarm-go/data
+        target: /data
+        bind:
+          create_host_path: false
+    restart: unless-stopped
+
+  runner:
+    <<: *runner-service
+    depends_on: [farm, runner-engine]
+    init: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    environment:
+      SERVER_PASSWORD: ${KEKWFARM_RUNNER_WEB_PASSWORD:-${SERVER_PASSWORD:-}}
+      KEKWFARM_FARM_URL: ${KEKWFARM_FARM_URL:-http://farm:5137}
+    ports:
+      - "127.0.0.1:5138:5138"
+    volumes:
+      - type: bind
+        source: ${KEKWFARM_RUNNER_CONFIG_FILE:-${KEKWFARM_CONFIG_FILE:-./duckfarm.json}}
+        target: /config/duckfarm.json
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./vol/duckfarm-go/runner
+        target: /data
+        bind:
+          create_host_path: false
+      - type: volume
+        source: runner-control
+        target: /control
+        read_only: true
+
+  runner-engine:
+    <<: *runner-service
+    command: ["-engine", "-data", "/uploads", "-control", "/control", "-docker-socket", "/var/run/docker.sock", "-worker-network", "bridge"]
+    network_mode: none
+    read_only: true
+    group_add:
+      - "${KEKWFARM_DOCKER_GID:-0}"
+    volumes:
+      - type: bind
+        source: ./vol/duckfarm-go/runner/uploads
+        target: /uploads
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: volume
+        source: runner-control
+        target: /control
+      - type: bind
+        source: ${KEKWFARM_DOCKER_SOCKET:-/var/run/docker.sock}
+        target: /var/run/docker.sock
+        read_only: true
+        bind:
+          create_host_path: false
+
+volumes:
+  runner-control:

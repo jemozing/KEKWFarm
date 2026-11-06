@@ -1,0 +1,83 @@
+services:
+  farm:
+    build:
+      context: ./server
+      dockerfile: ./docker/server/Dockerfile
+    volumes:
+      - ./server/app:/app
+    environment:
+      REDIS_URL: 'redis://redis:6379/0'
+      TEAM_TOKEN: ${TEAM_TOKEN:-}
+      SYSTEM_TOKEN: ${SYSTEM_TOKEN:-}
+      POSTGRES_DSN: 'host=postgres port=5432 user=farm password=farm dbname=farm'
+      SERVER_PASSWORD: ${SERVER_PASSWORD}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  celery:
+    build:
+      context: ./server
+      dockerfile: ./docker/celery/Dockerfile
+    volumes:
+      - ./server/app:/app
+    environment:
+      CELERY_BROKER_URL: 'redis://redis:6379/1'
+      TEAM_TOKEN: ${TEAM_TOKEN:-}
+      SYSTEM_TOKEN: ${SYSTEM_TOKEN:-}
+      POSTGRES_DSN: 'host=postgres port=5432 user=farm password=farm dbname=farm'
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  front:
+    build:
+      context: ./server
+      dockerfile: ./docker/front/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "5137:80"
+
+  postgres:
+    image: postgres:14.1-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: farm
+      POSTGRES_PASSWORD: farm
+      POSTGRES_DB: farm
+    volumes:
+      - ./vol/db:/var/lib/postgresql/data
+    healthcheck:
+      test: pg_isready -U farm -d farm
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  cacheproxy:
+    build: httpproxy
+    restart: unless-stopped
+    environment:
+      REDIS_URL: 'redis://redis:6379/2'
+    ports:
+      - "8888:8888"
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:7.2.0-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - ./vol/redis:/data
+
+  external_redis:
+    image: redis:7.2.0-alpine
+    ports:
+      - "6378:6379"
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${EXTERNAL_REDIS_PASSWORD:-changeme}"]
+    volumes:
+      - ./vol/external_redis:/data

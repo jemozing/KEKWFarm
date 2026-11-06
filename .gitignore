@@ -1,0 +1,13 @@
+.idea
+.DS_Store
+__pycache__
+.mypy_cache
+/vol
+/.env
+/.env.*
+!/.env.example
+/bin/
+/duckfarm.json
+/duckfarm.sqlite*
+/runner-data/
+*.token

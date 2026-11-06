@@ -1,0 +1,11 @@
+services:
+  farm:
+    ports:
+      - "${KEKWFARM_LAN_IP:?Set KEKWFARM_LAN_IP to the LAN IP of this host}:5137:5137"
+
+  runner:
+    ports:
+      - "${KEKWFARM_LAN_IP:?Set KEKWFARM_LAN_IP to the LAN IP of this host}:5138:5138"
+    environment:
+      KEKWFARM_FARM_URL: "http://${KEKWFARM_LAN_IP}:5137"
+      KEKWFARM_RUNNER_ADDRESS: "${KEKWFARM_LAN_IP}"
