@@ -34,6 +34,10 @@ CREATE TABLE IF NOT EXISTS checker_settings (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     config BLOB NOT NULL
 );
+CREATE TABLE IF NOT EXISTS submission_settings (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    config BLOB NOT NULL
+);
 CREATE TABLE IF NOT EXISTS runners (
     id TEXT PRIMARY KEY NOT NULL,
     name TEXT NOT NULL,
@@ -128,6 +132,21 @@ func (s *Store) LoadCheckerConfig(ctx context.Context) ([]byte, error) {
 
 func (s *Store) SaveCheckerConfig(ctx context.Context, config []byte) error {
 	_, err := s.db.ExecContext(ctx, `INSERT INTO checker_settings (id, config) VALUES (1, ?)
+        ON CONFLICT(id) DO UPDATE SET config = excluded.config`, config)
+	return err
+}
+
+func (s *Store) LoadSubmissionSettings(ctx context.Context) ([]byte, error) {
+	var config []byte
+	err := s.db.QueryRowContext(ctx, `SELECT config FROM submission_settings WHERE id = 1`).Scan(&config)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	return config, err
+}
+
+func (s *Store) SaveSubmissionSettings(ctx context.Context, config []byte) error {
+	_, err := s.db.ExecContext(ctx, `INSERT INTO submission_settings (id, config) VALUES (1, ?)
         ON CONFLICT(id) DO UPDATE SET config = excluded.config`, config)
 	return err
 }

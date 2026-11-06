@@ -73,9 +73,10 @@ main { padding-block: 30px 48px; }
 .runner-address { min-width: 15ch; }
 .runner-jobs { min-width: 145px; }
 [data-revoke-runner] { padding-inline: 8px; white-space: nowrap; }
-.checker-settings > p { margin-top: 6px; font-size: .9rem; }
+.checker-settings > p, .submission-settings > p { margin-top: 6px; font-size: .9rem; }
 .checker-settings .actions { margin-top: 14px; }
-#checker-controls { margin: 16px 0 0; padding: 0; border: 0; min-width: 0; }
+.submission-settings { border-top: 1px solid var(--border); margin-top: 20px; padding-top: 16px; }
+#checker-controls, #submission-controls { margin: 16px 0 0; padding: 0; border: 0; min-width: 0; }
 
 label { display: grid; gap: 4px; color: var(--muted); font-size: .86rem; }
 label.choice { display: flex; align-items: center; }

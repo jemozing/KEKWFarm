@@ -227,6 +227,34 @@
           </fieldset>
         </form>
         <p id="checker-message" class="notice" role="status" hidden></p>
+        <section class="submission-settings" aria-labelledby="submission-title">
+          <h2 id="submission-title">Flag format and timing</h2>
+          <p class="muted">The flag lifetime starts when the farm receives a flag. Set the interval and batch size according to the competition rules.</p>
+          <form id="submission-form" method="post" autocomplete="off">
+            <fieldset id="submission-controls" disabled>
+              <div class="fields">
+                <label class="wide">Flag pattern
+                  <input name="flag_format" spellcheck="false" aria-describedby="submission-pattern-hint" required>
+                </label>
+                <label>Flag lifetime (seconds)
+                  <input name="flag_lifetime_seconds" type="number" min="1" max="604800" step="1" required>
+                </label>
+                <label>Submission interval (seconds)
+                  <input name="submit_period_seconds" type="number" min="1" max="86400" step="1" required>
+                </label>
+                <label>Flags per batch
+                  <input name="submit_flag_limit" type="number" min="1" max="10000" step="1" required>
+                </label>
+              </div>
+              <p id="submission-pattern-hint" class="muted meta">Use Go regular expression syntax. Runners use the new pattern when they next load game configuration.</p>
+              <div class="actions">
+                <button type="submit">Save flag settings</button>
+                <button type="button" class="secondary" id="submission-omctf">Fill OmCTF defaults</button>
+              </div>
+            </fieldset>
+          </form>
+          <p id="submission-message" class="notice" role="status" hidden></p>
+        </section>
       </section>
     </div>
   </main>

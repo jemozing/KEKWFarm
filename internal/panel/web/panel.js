@@ -13,6 +13,9 @@ const checkerControls = byID("checker-controls");
 const checkerProtocol = byID("checker-protocol");
 const checkerJSON = byID("checker-json");
 const checkerFields = checkerForm.querySelectorAll("[data-checker-field]");
+const submissionForm = byID("submission-form");
+const submissionControls = byID("submission-controls");
+const submissionFields = submissionControls.querySelectorAll("input");
 const tcpFields = ["host", "port"];
 const httpTokenFields = ["url", "token"];
 const httpHostFields = ["url", "host", "port"];
@@ -20,6 +23,11 @@ const checkerPresets = {
   "": { fields: [], hint: "The farm keeps collecting flags while submission is disabled." },
   forcad_tcp: { label: "ForcAD · TCP", fields: [...tcpFields, "token"], hint: "Enter the checker host, port, and single-line team token." },
   forcad_http: { label: "ForcAD · HTTP", fields: httpTokenFields, hint: "Enter the complete HTTP(S) submission URL and team token." },
+  omctf: {
+    label: "OmCTF · Skipper", protocol: "forcad_http", fields: httpTokenFields,
+    defaultURL: "http://10.10.10.10/api/v1/flags",
+    hint: "Enter the team token from skipper-token.txt. The farm must be able to reach Skipper over the competition VPN.",
+  },
   ructf_tcp: { label: "RuCTF · TCP", fields: tcpFields, hint: "Enter the checker host and port." },
   ructf_http: { label: "RuCTF · HTTP", fields: httpTokenFields, hint: "Enter the complete HTTP(S) submission URL and team token." },
   ctfcup_tcp: { label: "CTFCup · TCP", fields: tcpFields, hint: "Enter the checker host and port." },
@@ -30,7 +38,7 @@ const checkerPresets = {
   volgactf_old: { label: "VolgaCTF / Themis · HTTP", fields: httpHostFields, hint: "Use the full URL or enter a host and optional port for HTTP /api/submit." },
 };
 for (const [id, preset] of Object.entries(checkerPresets)) {
-  if (id) checkerProtocol.add(new Option(`${preset.label} (${id})`, id));
+  if (id) checkerProtocol.add(new Option(`${preset.label} (${preset.protocol ?? id})`, id));
 }
 let password = "";
 let filters = new URLSearchParams();
@@ -40,6 +48,7 @@ let pendingRequest;
 let runnerRequest;
 let runnerPoll;
 let checkerSaveRequest;
+let submissionSaveRequest;
 let checkerOptions = {};
 let checkerOptionsProtocol = "";
 
@@ -48,6 +57,10 @@ function message(id, text = "", tone = "") {
   element.textContent = text;
   element.className = tone ? `notice ${tone}` : "notice";
   element.hidden = !text;
+}
+
+function updateRefreshButton() {
+  byID("refresh").disabled = Boolean(pendingRequest || checkerSaveRequest || submissionSaveRequest);
 }
 
 function showSession(active) {
@@ -65,7 +78,7 @@ function signOut(reason) {
   byID("password").value = "";
   byID("manual-form").reset();
   filtersForm.reset();
-  clearCheckerForm();
+  clearCheckerPage();
   clearRunners();
   for (const id of ["flags-body", "teams-body", "summary-body"]) {
     byID(id).replaceChildren();
@@ -383,7 +396,8 @@ function updateCheckerFields() {
     checkerInput("host").required = !checkerInput("url").value.trim();
     checkerInput("port").required = false;
   }
-  const optionsReset = checkerProtocol.value !== checkerOptionsProtocol && Object.keys(checkerOptions).length > 0;
+  const protocol = preset.protocol ?? checkerProtocol.value;
+  const optionsReset = protocol !== checkerOptionsProtocol && Object.keys(checkerOptions).length > 0;
   byID("checker-hint").textContent = optionsReset ? preset.hint + " Saving a different protocol clears the previous advanced options." : preset.hint;
 }
 
@@ -408,14 +422,24 @@ function clearCheckerForm() {
   message("checker-message");
 }
 
+function clearCheckerPage() {
+  clearCheckerForm();
+  submissionSaveRequest?.abort();
+  submissionSaveRequest = undefined;
+  submissionForm.reset();
+  submissionControls.disabled = true;
+  message("submission-message");
+}
+
 function fillCheckerForm(config) {
   if (checkerJSONMode()) {
     checkerJSON.value = JSON.stringify(config, null, 2);
     return;
   }
-  checkerProtocol.value = config.protocol ?? "";
+  const omctf = checkerPresets.omctf;
+  checkerProtocol.value = config.protocol === omctf.protocol && config.url === omctf.defaultURL ? "omctf" : (config.protocol ?? "");
   checkerOptions = config.options ?? {};
-  checkerOptionsProtocol = checkerProtocol.value;
+  checkerOptionsProtocol = config.protocol ?? "";
   for (const label of checkerFields) {
     const name = label.dataset.checkerField;
     checkerInput(name).value = config[name] || "";
@@ -424,9 +448,10 @@ function fillCheckerForm(config) {
 }
 
 function readCheckerForm() {
-  const protocol = checkerProtocol.value;
+  const preset = checkerPresets[checkerProtocol.value];
+  const protocol = preset.protocol ?? checkerProtocol.value;
   const config = { protocol, url: "", host: "", port: 0, token: "", team_id: "", options: {} };
-  for (const name of checkerPresets[protocol].fields) {
+  for (const name of preset.fields) {
     const value = checkerInput(name).value;
     config[name] = name === "port" ? Number(value) : name === "token" ? value : value.trim();
   }
@@ -447,21 +472,37 @@ function readCheckerJSON() {
   return config;
 }
 
-async function loadChecker(signal) {
-  checkerControls.disabled = true;
-  message("checker-message");
-  const config = await api("checker_config", { signal, cache: "no-store" });
-  if (signal.aborted) return;
-  fillCheckerForm(config);
-  checkerControls.disabled = false;
+function fillSubmissionSettings(config) {
+  for (const input of submissionFields) input.value = config[input.name];
+}
+
+function readSubmissionSettings() {
+  const config = {};
+  for (const input of submissionFields) {
+    config[input.name] = input.type === "number" ? input.valueAsNumber : input.value;
+  }
+  return config;
+}
+
+async function loadSettings(path, controls, messageID, fill, signal) {
+  controls.disabled = true;
+  message(messageID);
+  try {
+    const config = await api(path, { signal, cache: "no-store" });
+    if (signal.aborted) return;
+    fill(config);
+    controls.disabled = false;
+  } catch (error) {
+    if (!signal.aborted) message(messageID, error.message, "error");
+  }
 }
 
 async function refresh(targetPage = page, silent = false) {
   if (!password) return;
   const requestedView = window.location.hash.slice(1);
   const view = Object.hasOwn(views, requestedView) ? requestedView : "flags";
-  if (view === "checker" && checkerSaveRequest) return;
-  if (view !== "checker" && !byID("checker-view").hidden) clearCheckerForm();
+  if (view === "checker" && (checkerSaveRequest || submissionSaveRequest)) return;
+  if (view !== "checker" && !byID("checker-view").hidden) clearCheckerPage();
   if (view !== "runners" && !byID("runners-view").hidden) clearRunners();
   clearTimeout(runnerPoll);
   pendingRequest?.abort();
@@ -475,7 +516,7 @@ async function refresh(targetPage = page, silent = false) {
     else link.removeAttribute("aria-current");
   }
   byID("page-title").textContent = views[view];
-  byID("refresh").disabled = true;
+  updateRefreshButton();
   updatePager(true);
   if (!silent) message("page-message", "Loading…");
   try {
@@ -483,13 +524,17 @@ async function refresh(targetPage = page, silent = false) {
     else if (view === "teams") await loadTeams(signal);
     else if (view === "summary") await loadSummary(signal);
     else if (view === "runners") await loadRunners(signal);
-    else await loadChecker(signal);
+    else await Promise.all([
+      loadSettings("checker_config", checkerControls, "checker-message", fillCheckerForm, signal),
+      loadSettings("submission_settings", submissionControls, "submission-message", fillSubmissionSettings, signal),
+    ]);
     if (!signal.aborted) message("page-message");
   } catch (error) {
     if (!signal.aborted) message("page-message", error.message, "error");
   } finally {
     if (pendingRequest === controller) {
-      byID("refresh").disabled = false;
+      pendingRequest = undefined;
+      updateRefreshButton();
       updatePager();
       if (view === "runners" && password && window.location.hash === "#runners" && !document.hidden) {
         runnerPoll = setTimeout(() => refresh(page, true), 5000);
@@ -547,7 +592,14 @@ byID("copy-runner-token").addEventListener("click", async () => {
   message("runner-copy-message", copied ? "Token copied." : "Token selected. Use your browser's copy command.", copied ? "success" : "");
 });
 
-checkerProtocol.addEventListener("change", updateCheckerFields);
+checkerProtocol.addEventListener("change", () => {
+  const { defaultURL } = checkerPresets[checkerProtocol.value];
+  if (defaultURL) {
+    checkerInput("url").value = defaultURL;
+    checkerInput("token").value = "";
+  }
+  updateCheckerFields();
+});
 checkerInput("url").addEventListener("input", updateCheckerFields);
 byID("checker-mode").addEventListener("click", () => {
   if (!checkerJSONMode()) {
@@ -560,7 +612,8 @@ byID("checker-mode").addEventListener("click", () => {
   }
   try {
     const config = readCheckerJSON();
-    if (!Object.hasOwn(checkerPresets, config.protocol ?? "")) {
+    const protocol = config.protocol ?? "";
+    if (!Object.hasOwn(checkerPresets, protocol) || checkerPresets[protocol].protocol) {
       throw new Error("Choose an existing protocol ID before using the form.");
     }
     setCheckerMode(false);
@@ -592,7 +645,7 @@ checkerForm.addEventListener("submit", async (event) => {
   const controller = new AbortController();
   checkerSaveRequest = controller;
   checkerControls.disabled = true;
-  byID("refresh").disabled = true;
+  updateRefreshButton();
   message("checker-message", "Saving…");
   try {
     const saved = await api("checker_config", { method: "PUT", payload: config, signal: controller.signal, cache: "no-store" });
@@ -605,7 +658,39 @@ checkerForm.addEventListener("submit", async (event) => {
     if (checkerSaveRequest === controller) {
       checkerSaveRequest = undefined;
       checkerControls.disabled = false;
-      byID("refresh").disabled = false;
+      updateRefreshButton();
+    }
+  }
+});
+
+byID("submission-omctf").addEventListener("click", () => {
+  submissionForm.elements.namedItem("flag_format").value = "[A-Z0-9]{31}=";
+  submissionForm.elements.namedItem("flag_lifetime_seconds").value = "600";
+  submissionForm.elements.namedItem("submit_period_seconds").value = "2";
+  message("submission-message", "OmCTF values filled. Review the batch limit and save to apply.");
+});
+
+submissionForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (submissionControls.disabled) return;
+  const config = readSubmissionSettings();
+  const controller = new AbortController();
+  submissionSaveRequest = controller;
+  submissionControls.disabled = true;
+  updateRefreshButton();
+  message("submission-message", "Saving…");
+  try {
+    const saved = await api("submission_settings", { method: "PUT", payload: config, signal: controller.signal, cache: "no-store" });
+    if (controller.signal.aborted) return;
+    fillSubmissionSettings(saved);
+    message("submission-message", "Flag settings saved.", "success");
+  } catch (error) {
+    if (!controller.signal.aborted) message("submission-message", error.message, "error");
+  } finally {
+    if (submissionSaveRequest === controller) {
+      submissionSaveRequest = undefined;
+      submissionControls.disabled = false;
+      updateRefreshButton();
     }
   }
 });

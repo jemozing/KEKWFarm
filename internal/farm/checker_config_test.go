@@ -22,7 +22,7 @@ func TestCheckerConfigPersistsDisable(t *testing.T) {
 			t.Fatal(err)
 		}
 		t.Cleanup(func() { db.Close() })
-		s := &server{config: Config{Checker: fallback, Password: "test"}, store: db, checkerChanged: make(chan struct{}, 1)}
+		s := &server{config: Config{Checker: fallback, Password: "test"}, store: db}
 		if err := s.loadChecker(t.Context()); err != nil {
 			t.Fatal(err)
 		}

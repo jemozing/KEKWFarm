@@ -6,7 +6,6 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"regexp"
 	"sort"
 	"sync"
 	"time"
@@ -17,15 +16,16 @@ import (
 )
 
 type server struct {
-	config         Config
-	store          *store.Store
-	pattern        *regexp.Regexp
-	location       *time.Location
-	teams          []team
-	wake           chan struct{}
-	checkerChanged chan struct{}
-	checkerMu      sync.RWMutex
-	checker        checkerState
+	config          Config
+	store           *store.Store
+	location        *time.Location
+	teams           []team
+	wake            chan struct{}
+	settingsChanged chan struct{}
+	checkerMu       sync.RWMutex
+	checker         checkerState
+	submissionMu    sync.RWMutex
+	submission      submissionState
 }
 
 type team struct {
@@ -38,9 +38,8 @@ func Run(ctx context.Context, config Config, ready func(net.Addr)) error {
 		return err
 	}
 	s := &server{
-		config: config, wake: make(chan struct{}, 1), checkerChanged: make(chan struct{}, 1),
-		pattern: regexp.MustCompile(config.FlagFormat),
-		teams:   make([]team, 0, len(config.Teams)),
+		config: config, wake: make(chan struct{}, 1), settingsChanged: make(chan struct{}, 1),
+		teams: make([]team, 0, len(config.Teams)),
 	}
 	s.location, _ = time.LoadLocation(config.Timezone)
 	for name, address := range config.Teams {
@@ -59,6 +58,9 @@ func Run(ctx context.Context, config Config, ready func(net.Addr)) error {
 	}
 	defer s.store.Close()
 	if err := s.loadChecker(ctx); err != nil {
+		return err
+	}
+	if err := s.loadSubmissionSettings(ctx); err != nil {
 		return err
 	}
 
@@ -105,6 +107,8 @@ func (s *server) routes() http.Handler {
 	api.HandleFunc("GET /api/get_config", s.authorizeRunnerOrPassword(s.getConfig))
 	api.HandleFunc("GET /api/checker_config", s.authorize(s.getCheckerConfig))
 	api.HandleFunc("PUT /api/checker_config", s.authorize(s.putCheckerConfig))
+	api.HandleFunc("GET /api/submission_settings", s.authorize(s.getSubmissionSettings))
+	api.HandleFunc("PUT /api/submission_settings", s.authorize(s.putSubmissionSettings))
 	api.HandleFunc("POST /api/post_flags", s.authorizeRunnerOrPassword(s.postFlags))
 	api.HandleFunc("POST /api/runner/heartbeat", s.runnerHeartbeat)
 	api.HandleFunc("GET /api/runners", s.authorize(s.listRunners))
@@ -123,27 +127,46 @@ func (s *server) routes() http.Handler {
 	return mux
 }
 
+func (s *server) notifySettingsChanged() {
+	select {
+	case s.settingsChanged <- struct{}{}:
+	default:
+	}
+}
+
 func (s *server) work(ctx context.Context) {
-	period := time.Duration(s.config.SubmitPeriod) * time.Second
-	var nextSubmit time.Time
+	var lastSubmit time.Time
 	for ctx.Err() == nil {
+		active := s.currentChecker()
+		// Finish queue maintenance and reserve the batch before a settings save can take effect.
+		s.submissionMu.RLock()
+		settings := s.submission
+		period := time.Duration(settings.SubmitPeriod) * time.Second
+		nextSubmit := lastSubmit.Add(period)
 		now := time.Now()
+		lease := now.Unix() + int64(s.config.SubmitTimeout) + 15
 		var retain int64
+		var items []store.Item
 		if s.config.Retention > 0 {
 			retain = now.Add(-time.Duration(s.config.Retention) * time.Hour).Unix()
 		}
-		err := s.store.Maintain(ctx, now.Unix(), now.Unix()-int64(s.config.FlagLifetime), retain)
-		active := s.currentChecker()
-		if err != nil {
+		if err := s.store.Maintain(ctx, now.Unix(), now.Unix()-int64(settings.FlagLifetime), retain); err != nil {
 			if ctx.Err() == nil {
 				log.Printf("maintain flags: %v", err)
 			}
 		} else if active.submit != nil && !now.Before(nextSubmit) {
-			if started := s.submitBatch(ctx, active, time.Now().Unix()); !started.IsZero() {
-				nextSubmit = started.Add(period)
-				if !time.Now().Before(nextSubmit) {
-					continue
-				}
+			var err error
+			items, err = s.store.Claim(ctx, now.Unix(), lease, settings.SubmitLimit)
+			if err != nil && ctx.Err() == nil {
+				log.Printf("claim flags: %v", err)
+			}
+		}
+		s.submissionMu.RUnlock()
+		if len(items) != 0 {
+			lastSubmit = s.submitBatch(ctx, active, items, lease)
+			nextSubmit = lastSubmit.Add(period)
+			if !time.Now().Before(nextSubmit) {
+				continue
 			}
 		}
 
@@ -161,26 +184,14 @@ func (s *server) work(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 		case <-wake:
-		case <-s.checkerChanged:
+		case <-s.settingsChanged:
 		case <-timer.C:
 		}
 		timer.Stop()
 	}
 }
 
-func (s *server) submitBatch(ctx context.Context, active checkerState, now int64) time.Time {
-	lease := now + int64(s.config.SubmitTimeout) + 15
-	items, err := s.store.Claim(ctx, now, lease, s.config.SubmitLimit)
-	if err != nil {
-		if ctx.Err() == nil {
-			log.Printf("claim flags: %v", err)
-		}
-		return time.Time{}
-	}
-	if len(items) == 0 {
-		return time.Time{}
-	}
-
+func (s *server) submitBatch(ctx context.Context, active checkerState, items []store.Item, lease int64) time.Time {
 	flags := make([]string, len(items))
 	for i, item := range items {
 		flags[i] = item.Flag

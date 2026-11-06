@@ -106,9 +106,6 @@ func (s *server) putCheckerConfig(w http.ResponseWriter, r *http.Request) {
 		problem(w, http.StatusInternalServerError, "Could not save checker configuration")
 		return
 	}
-	select {
-	case s.checkerChanged <- struct{}{}:
-	default:
-	}
+	s.notifySettingsChanged()
 	writeJSON(w, http.StatusOK, config)
 }

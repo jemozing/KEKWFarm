@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"regexp"
 	"strings"
 	"time"
 	_ "time/tzdata"
@@ -78,19 +77,13 @@ func (c Config) validate() error {
 			return fmt.Errorf("team names and addresses must be non-empty")
 		}
 	}
-	if c.FlagFormat == "" {
-		return fmt.Errorf("flag_format must not be empty")
+	if _, err := c.submissionSettings().compile(); err != nil {
+		return err
 	}
-	if _, err := regexp.Compile(c.FlagFormat); err != nil {
-		return fmt.Errorf("flag_format: %w", err)
-	}
-	if c.FlagLifetime < 1 || c.FlagLifetime > 604800 ||
-		c.SubmitPeriod < 1 || c.SubmitPeriod > 86400 ||
-		c.SubmitLimit < 1 || c.SubmitLimit > 10000 ||
-		c.SubmitTimeout < 1 || c.SubmitTimeout > 3600 ||
+	if c.SubmitTimeout < 1 || c.SubmitTimeout > 3600 ||
 		c.RetryDelay < 1 || c.RetryDelay > 86400 ||
 		c.Retention < 0 || c.Retention > 87600 {
-		return fmt.Errorf("invalid lifetime, submit limit, timeout, retry delay or history retention")
+		return fmt.Errorf("invalid timeout, retry delay or history retention")
 	}
 	if c.Timezone == "" {
 		return fmt.Errorf("timezone must be set")

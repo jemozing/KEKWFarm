@@ -68,10 +68,11 @@ func (s *server) login(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) getConfig(w http.ResponseWriter, _ *http.Request) {
+	settings := s.currentSubmission()
 	writeJSON(w, http.StatusOK, map[string]any{
-		"TEAMS": s.config.Teams, "FLAG_FORMAT": s.config.FlagFormat,
-		"FLAG_LIFETIME": s.config.FlagLifetime, "SUBMIT_PERIOD": s.config.SubmitPeriod,
-		"SUBMIT_FLAG_LIMIT": s.config.SubmitLimit, "TIMEZONE": s.config.Timezone,
+		"TEAMS": s.config.Teams, "FLAG_FORMAT": settings.FlagFormat,
+		"FLAG_LIFETIME": settings.FlagLifetime, "SUBMIT_PERIOD": settings.SubmitPeriod,
+		"SUBMIT_FLAG_LIMIT": settings.SubmitLimit, "TIMEZONE": s.config.Timezone,
 	})
 }
 
@@ -96,8 +97,9 @@ func (s *server) postFlags(w http.ResponseWriter, r *http.Request) {
 			problem(w, http.StatusBadRequest, "Invalid flag text")
 			return
 		}
+		pattern := s.currentSubmission().pattern
 		for _, line := range strings.Split(input.Text, "\n") {
-			for _, flag := range s.pattern.FindAllString(strings.TrimSuffix(line, "\r"), maxFlags+1-len(flags)) {
+			for _, flag := range pattern.FindAllString(strings.TrimSuffix(line, "\r"), maxFlags+1-len(flags)) {
 				flags = append(flags, store.Item{Flag: flag, Sploit: "Manual", Team: "*"})
 			}
 			if len(flags) > maxFlags {
@@ -151,7 +153,7 @@ func (s *server) filterConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"filters": filters, "flag_format": s.config.FlagFormat, "server_tz": s.config.Timezone,
+		"filters": filters, "flag_format": s.currentSubmission().FlagFormat, "server_tz": s.config.Timezone,
 	})
 }
 
